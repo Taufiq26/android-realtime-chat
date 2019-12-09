@@ -3,6 +3,7 @@ package com.example.realtimechat;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import android.os.Bundle;
 import android.util.Log;
@@ -26,12 +27,17 @@ import com.google.firebase.database.FirebaseDatabase;
 import java.util.HashMap;
 import java.util.Map;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements SwipeRefreshLayout.OnRefreshListener {
+
+    SwipeRefreshLayout mSwipeRefreshLayout;
+
+    private static final int limitPerLoad = 10;
 
     public static String TAG = "FirebaseUI.chat";
     private Firebase mRef;
     private Query mChatRef;
     private String roomChat;
+    private int roomChatLimit;
 //    private long userId = 1;
 //    private String mName = "I
 //    pin";
@@ -64,10 +70,11 @@ public class MainActivity extends AppCompatActivity {
 
         mRef = new Firebase("https://realtimechat-8b01a.firebaseio.com");
         roomChat = "chat";
+        roomChatLimit = limitPerLoad;
         // no limit chat to show
-        mChatRef = mRef.child(roomChat);
+//        mChatRef = mRef.child(roomChat);
         // set limit chat to show from last
-//        mChatRef = mRef.child(roomChat).limitToLast(10);
+        mChatRef = mRef.child(roomChat).limitToLast(roomChatLimit);
 
         mRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
@@ -106,13 +113,70 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+        initRecycler();
+    }
+
+    /**
+     * This method is called when swipe refresh is pulled down
+     */
+    @Override
+    public void onRefresh() {
+        roomChatLimit += limitPerLoad;
+        mChatRef = mRef.child(roomChat).limitToLast(roomChatLimit);
+
+        loadRecyclerViewData();
+    }
+
+    private void initRecycler() {
         mMessages = (RecyclerView) findViewById(R.id.messagesList);
 
         LinearLayoutManager manager = new LinearLayoutManager(this);
+        // keep order to normal (top to bottom)
         manager.setReverseLayout(false);
+        // auto to the bottom of the view
+        manager.setStackFromEnd(true);
 
         mMessages.setHasFixedSize(false);
         mMessages.setLayoutManager(manager);
+
+        // pull to refresh (load more)
+        mSwipeRefreshLayout = (SwipeRefreshLayout) findViewById(R.id.swipe_container);
+        mSwipeRefreshLayout.setOnRefreshListener((SwipeRefreshLayout.OnRefreshListener) this);
+        mSwipeRefreshLayout.setColorSchemeResources(R.color.colorPrimary,
+                android.R.color.holo_green_dark,
+                android.R.color.holo_orange_dark,
+                android.R.color.holo_blue_dark);
+
+        /**
+         * Showing Swipe Refresh animation on activity create
+         * As animation won't start on onCreate, post runnable is used
+         */
+        mSwipeRefreshLayout.post(new Runnable() {
+
+            @Override
+            public void run() {
+
+                mSwipeRefreshLayout.setRefreshing(true);
+
+                // Fetching data from server
+                loadRecyclerViewData();
+            }
+        });
+    }
+
+    private void loadRecyclerViewData() {
+        mSwipeRefreshLayout.setRefreshing(true);
+
+        if (roomChatLimit > limitPerLoad) {
+            LinearLayoutManager manager = new LinearLayoutManager(this);
+            // keep order to normal (top to bottom)
+            manager.setReverseLayout(false);
+
+            manager.setStackFromEnd(false);
+
+            mMessages.setHasFixedSize(false);
+            mMessages.setLayoutManager(manager);
+        }
 
         mRecycleViewAdapter = new FirebaseRecyclerAdapter<ChatModel, ChatHolder>(ChatModel.class, R.layout.text_message, ChatHolder.class, mChatRef) {
             @Override
@@ -131,6 +195,9 @@ public class MainActivity extends AppCompatActivity {
         };
 
         mMessages.setAdapter(mRecycleViewAdapter);
+
+        // Stopping swipe refresh
+        mSwipeRefreshLayout.setRefreshing(false);
     }
 
     public static class ChatHolder extends RecyclerView.ViewHolder {
