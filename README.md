@@ -13,3 +13,5 @@ https://medium.com/android-school/firebaseinstanceidservice-is-deprecated-50651f
 https://www.androidauthority.com/android-push-notifications-with-firebase-cloud-messaging-925075/
 ## Send Notification Using Postman
 https://medium.com/android-school/test-fcm-notification-with-postman-f91ba08aacc3
+## Send Notification Using Android App
+https://blog.usejournal.com/send-device-to-device-push-notifications-without-server-side-code-238611c143
