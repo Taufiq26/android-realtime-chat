@@ -8,6 +8,7 @@ public class ChatModel {
     private long userId;
     private long timestamp;
     private String formattedTime;
+    private String deviceToken;
 
     public ChatModel() {
 
@@ -15,16 +16,17 @@ public class ChatModel {
         message = "";
         userId = 69;
         timestamp = 0;
-
+        deviceToken = "";
 
     }
 
-    public ChatModel(String message, String name, long uid,  long time, String formattedTime) {
+    public ChatModel(String message, String name, long uid,  long time, String formattedTime, String deviceToken) {
         this.name = name;
         this.message = message;
         this.userId = uid;
         this.timestamp = time;
         this.formattedTime = formattedTime;
+        this.deviceToken = deviceToken;
     }
 
     public String getName() {
@@ -85,5 +87,13 @@ public class ChatModel {
         }else{
             return DateFormat.format("dd MMM - hh:mm a", timestamp).toString();
         }
+    }
+
+    public String getDeviceToken() {
+        return deviceToken;
+    }
+
+    public void setDeviceToken(String deviceToken) {
+        this.deviceToken = deviceToken;
     }
 }

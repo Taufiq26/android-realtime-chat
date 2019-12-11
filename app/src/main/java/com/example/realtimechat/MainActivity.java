@@ -1,5 +1,6 @@
 package com.example.realtimechat;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -15,16 +16,31 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
+import com.android.volley.AuthFailureError;
+import com.android.volley.Response;
+import com.android.volley.VolleyError;
+import com.android.volley.toolbox.JsonObjectRequest;
+import com.example.realtimechat.services.MySingleton;
 import com.firebase.client.DataSnapshot;
 import com.firebase.client.Firebase;
 import com.firebase.client.FirebaseError;
 import com.firebase.client.Query;
 import com.firebase.client.ValueEventListener;
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.Task;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.iid.FirebaseInstanceId;
+import com.google.firebase.iid.InstanceIdResult;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class MainActivity extends AppCompatActivity implements SwipeRefreshLayout.OnRefreshListener {
@@ -38,14 +54,29 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
     private Query mChatRef;
     private String roomChat;
     private int roomChatLimit;
+
+    // variable for data user
 //    private long userId = 1;
-//    private String mName = "I
-//    pin";
+//    private String mName = "Ipin";
     private long userId = 2;
     private String mName = "Upin";
+    private String mDeviceToken;
     private String mTime;
     private Button mSendButton;
     private EditText mMessageEdit;
+    // ----------
+
+    // variable for sending notification
+    private List<String> devicesToken = new ArrayList<String>();
+
+    final private String FCM_API = "https://fcm.googleapis.com/fcm/send";
+    final private String serverKey = "key=" + "AAAAGz6ZO2c:APA91bHZFSDy7ab5vC7I33NFkovQOf2z8VqkT0W5exgNFRCD002saL8ac8chLjo7KnNlQtGbSK5Zyett0AsMNXAkfQTqEpiwKef5P5b4VqMrol0w2K0oRWPFsY-AY3kPi33sdeOTPi0p";
+    final private String contentType = "application/json";
+    final String TAG_NOTIF = "NOTIFICATION TAG";
+
+    String NOTIFICATION_TITLE;
+    String NOTIFICATION_MESSAGE;
+    // ----------
 
     private RecyclerView mMessages;
     private FirebaseRecyclerAdapter<ChatModel, ChatHolder> mRecycleViewAdapter;
@@ -59,12 +90,24 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
         mSendButton = (Button) findViewById(R.id.sendButton);
         mMessageEdit = (EditText) findViewById(R.id.messageEdit);
 
-        mSendButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-//                showFirebaseLoginPrompt();
-            }
-        });
+
+        // generate token device
+        FirebaseInstanceId.getInstance().getInstanceId()
+                .addOnCompleteListener(new OnCompleteListener<InstanceIdResult>() {
+                    @Override
+                    public void onComplete(@NonNull Task<InstanceIdResult> task) {
+                        if (!task.isSuccessful()) {
+                            //To do//
+                            return;
+                        }
+
+                        // Get the Instance ID token//
+                        String token = task.getResult().getToken();
+                        String msg = "FCM Token : "+token;
+                        Log.d(TAG, msg);
+                        mDeviceToken = token;
+                    }
+                });
 
 
 
@@ -95,11 +138,13 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
             }
         });
 
+        initRecycler();
+
         mSendButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 // set data
-                ChatModel chat = new ChatModel(mMessageEdit.getText().toString(), mName, userId, System.currentTimeMillis(), mTime);
+                ChatModel chat = new ChatModel(mMessageEdit.getText().toString(), mName, userId, System.currentTimeMillis(), mTime, mDeviceToken);
                 // send data to realtime database
                 mRef.child(roomChat).push().setValue(chat, new Firebase.CompletionListener() {
                     @Override
@@ -109,11 +154,32 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
                         }
                     }
                 });
+
+                // send notification to other user(s)
+                NOTIFICATION_TITLE = mName;
+                NOTIFICATION_MESSAGE = mMessageEdit.getText().toString();
+
+                JSONObject notification = new JSONObject();
+                JSONObject notifcationBody = new JSONObject();
+                for (int i=0; i<devicesToken.size(); i++) {
+                    Log.i("Other Device Token ",devicesToken.get(i));
+                    try {
+                        notifcationBody.put("title", NOTIFICATION_TITLE);
+                        notifcationBody.put("body", NOTIFICATION_MESSAGE);
+
+                        notification.put("to", devicesToken.get(i));
+                        notification.put("data", notifcationBody);
+                        notification.put("notification", notifcationBody);
+                    } catch (JSONException e) {
+                        Log.e(TAG, "onCreate: " + e.getMessage() );
+                    }
+                    sendNotification(notification);
+                }
+                // ----------
+
                 mMessageEdit.setText("");
             }
         });
-
-        initRecycler();
     }
 
     /**
@@ -178,6 +244,7 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
             mMessages.setLayoutManager(manager);
         }
 
+        devicesToken.clear();
         mRecycleViewAdapter = new FirebaseRecyclerAdapter<ChatModel, ChatHolder>(ChatModel.class, R.layout.text_message, ChatHolder.class, mChatRef) {
             @Override
             public void populateViewHolder(ChatHolder chatView, ChatModel chat, int position) {
@@ -185,11 +252,30 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
                 chatView.setName(chat.getName());
                 chatView.setTime(chat.getFormattedTime());
 
-
                 if (chat.getUserId() == userId) {
                     chatView.setIsSender(true);
                 } else {
                     chatView.setIsSender(false);
+                }
+
+                // save devices token
+                if (devicesToken.size() == 0) {
+                    Log.i("Devices Token yeuh : ","masuk if 1");
+                    if (!mDeviceToken.equals(chat.getDeviceToken())) {
+                        Log.i("Devices Token yeuh : ","masuk if 2");
+                        devicesToken.add(chat.getDeviceToken());
+                    }
+                } else {
+                    int duplicate = 0;
+                    // find token in array
+                    for (int i = 0; i < devicesToken.size(); i++) {
+                        if (chat.getDeviceToken().equals(devicesToken.get(i)))
+                            duplicate = 1;
+                    }
+
+                    // check if no device token exactly the same and not equal with mine
+                    if (duplicate == 0 && !devicesToken.equals(chat.getDeviceToken()))
+                        devicesToken.add(chat.getDeviceToken());
                 }
             }
         };
@@ -198,6 +284,32 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
 
         // Stopping swipe refresh
         mSwipeRefreshLayout.setRefreshing(false);
+    }
+
+    private void sendNotification(JSONObject notification) {
+        JsonObjectRequest jsonObjectRequest = new JsonObjectRequest(FCM_API, notification,
+                new com.android.volley.Response.Listener<JSONObject>() {
+                    @Override
+                    public void onResponse(JSONObject response) {
+                        Log.i(TAG_NOTIF, "onResponse: " + response.toString());
+                    }
+                },
+                new Response.ErrorListener() {
+                    @Override
+                    public void onErrorResponse(VolleyError error) {
+                        Toast.makeText(MainActivity.this, "Request error", Toast.LENGTH_LONG).show();
+                        Log.i(TAG_NOTIF, "onErrorResponse: Didn't work\n"+error);
+                    }
+                }){
+            @Override
+            public Map<String, String> getHeaders() throws AuthFailureError {
+                Map<String, String> params = new HashMap<>();
+                params.put("Authorization", serverKey);
+                params.put("Content-Type", contentType);
+                return params;
+            }
+        };
+        MySingleton.getInstance(getApplicationContext()).addToRequestQueue(jsonObjectRequest);
     }
 
     public static class ChatHolder extends RecyclerView.ViewHolder {
