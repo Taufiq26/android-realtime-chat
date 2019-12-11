@@ -2,6 +2,7 @@
 
 ## Realtime Chat
 https://www.codepolitan.com/membuat-realtime-chat-sederhana-menggunakan-android-studio-dengan-database-firebase-57cd28c69a642-14500
+
 https://wirasetiawan.blog/2016/05/20/membuat-aplikasi-chat-sederhana-dengan-firebase-di-android/
 
 ## Notification
