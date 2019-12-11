@@ -7,11 +7,11 @@ https://wirasetiawan.blog/2016/05/20/membuat-aplikasi-chat-sederhana-dengan-fire
 
 ## Notification
 https://www.codementor.io/flame3/send-push-notifications-to-android-with-firebase-du10860kb
-## FirebaseInstanceIdService deprecated
+### FirebaseInstanceIdService deprecated
 https://medium.com/android-school/firebaseinstanceidservice-is-deprecated-50651f17a148
-## Firebase notification while app in foreground
+### Firebase notification while app in foreground
 https://www.androidauthority.com/android-push-notifications-with-firebase-cloud-messaging-925075/
-## Send Notification Using Postman
+### Send Notification Using Postman
 https://medium.com/android-school/test-fcm-notification-with-postman-f91ba08aacc3
-## Send Notification Using Android App
+### Send Notification Using Android App
 https://blog.usejournal.com/send-device-to-device-push-notifications-without-server-side-code-238611c143
